@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="100%" height="100%" viewBox="0 0 600 600">
+
+  <title>SimpleDraw</title>
+
+  <script type="text/ecmascript"><![CDATA[
+    window.onclick = drawDot;
+    
+    function drawDot ( event ) {
+      // namespace constant
+      var svgns = "http://www.w3.org/2000/svg";
+
+      // get backdrop element
+      var coords = localCoords( event );
+
+      var dot = document.createElementNS(svgns, "circle");
+      dot.setAttribute("cx", coords.x);
+      dot.setAttribute("cy", coords.y);
+      dot.setAttribute("r", "2");
+      dot.setAttribute("fill", "none");
+      dot.setAttribute("stroke", "blue");
+      dot.setAttribute("stroke-linecap", "round");
+      dot.setAttribute("stroke-linejoin", "round");
+      document.documentElement.appendChild( dot );
+    }
+
+    // adjust coordinates for transforms
+    function localCoords (event) {
+      var backdrop = document.getElementById("backdrop");
+      var p = document.documentElement.createSVGPoint();
+      p.x = event.clientX;
+      p.y = event.clientY;
+      return p.matrixTransform(backdrop.getScreenCTM().inverse());
+    }   
+
+  ]]></script>
+
+  <style>
+    rect#backdrop {
+      fill: url(#grid100);
+      stroke: gray;
+    }
+
+    /*
+    rect {
+      shape-rendering: geometricPrecision;
+    }
+    */
+  </style>
+
+
+  <defs>
+    <linearGradient id="diagradient"
+                    x1="0%" y1="0%"
+                    x2="100%" y2="100%">
+      <stop offset="0" stop-color="pink" stop-opacity="1"/>
+      <stop offset="0.5" stop-color="pink" stop-opacity="0"/>
+      <stop offset="1" stop-color="orange" stop-opacity="0.5"/>
+    </linearGradient>
+
+    <pattern id="grid100" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="100" height="100" style="fill:url(#diagradient);"/>
+    </pattern>
+  </defs>
+
+
+  <rect id="backdrop" x="0" y="0" width="600" height="600"/>
+
+</svg>

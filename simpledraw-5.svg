@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="100%" height="100%" viewBox="0 0 600 600">
+
+  <title>SimpleDraw</title>
+
+  <script type="text/ecmascript"><![CDATA[
+    window.onload = function () {
+      var dnd = new simpledrawObj();
+      dnd.init();
+    }
+
+    function simpledrawObj() {
+  	  this.root = document.documentElement;
+      this.backdrop = document.getElementById("backdrop");
+  	  this.coords = document.documentElement.createSVGPoint();
+      this.canvas = document.getElementById("canvas");
+
+      this.activeEl = null;
+
+      this.buttons = null;
+      this.mode = "draw";
+
+      // constants
+      this.svgns = "http://www.w3.org/2000/svg";
+      this.xlinkns = "http://www.w3.org/1999/xlink";
+  	}
+
+    simpledrawObj.prototype.init = function (event){
+      this.root.addEventListener('click', bind(this, this.drawDot), false );
+
+      this.root.addEventListener('mousedown', bind(this, this.grab), false );
+      this.root.addEventListener('mousemove', bind(this, this.drag), false );
+      this.root.addEventListener('mouseup', bind(this, this.drop), false );
+
+      this.buttons = this.root.querySelectorAll("[role='button']");
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.addEventListener('click', bind(this, this.handleButtons), false );
+      }
+    }
+
+
+    /*
+    // draw
+    */
+    simpledrawObj.prototype.drawDot = function (event){
+      if ( "draw" == this.mode ){
+        if ( this.backdrop == event.target || this.canvas == event.target.parentNode ) {
+          // adjust coords
+          this.coords = localCoords(event, this.backdrop);
+
+          this.activeEl = document.createElementNS(this.svgns, "circle");
+          this.activeEl.setAttribute("cx", this.coords.x);
+          this.activeEl.setAttribute("cy", this.coords.y);
+          this.activeEl.setAttribute("r", "2");
+          this.activeEl.setAttribute("fill", "none");
+          this.activeEl.setAttribute("stroke", "blue");
+          this.activeEl.setAttribute("stroke-width", "3");
+          this.activeEl.setAttribute("stroke-linecap", "round");
+          this.activeEl.setAttribute("stroke-linejoin", "round");
+
+          // note that we're now appending draw elements to a specific canvas
+          this.canvas.appendChild( this.activeEl );
+
+          // if we don't set this to null, it starts dragging immediately!
+          this.activeEl = null;
+        }
+      } 
+    }
+
+
+    /*
+    // drag-n-drop
+    */
+    simpledrawObj.prototype.grab = function (event){
+      if ( "drag" == this.mode ){
+        // stop native drag-n-drop
+        event.preventDefault();
+        event.stopPropagation();
+
+        // only grab things in drawing area
+        if ( this.canvas == event.target.parentNode ) {
+          var target = event.target;
+          if (this.backdrop != target) {
+            this.activeEl = target;
+          }
+        }
+      } 
+    }
+
+    simpledrawObj.prototype.drag = function (event){
+      if ( "drag" == this.mode ){
+        if ( this.activeEl ) {
+          this.coords = localCoords(event, this.backdrop);
+          this.activeEl.setAttribute("cx", this.coords.x);
+          this.activeEl.setAttribute("cy", this.coords.y);
+        }
+      }
+    }
+
+    simpledrawObj.prototype.drop = function (event){
+      if ( "drag" == this.mode ){
+        this.activeEl = null;
+      }
+    }
+
+
+    /*
+    // UI controls
+    */
+    simpledrawObj.prototype.handleButtons = function (event){
+      // console.log("ok");
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.setAttribute("aria-pressed", "false" );
+      }
+
+      var target = event.target.parentNode;
+      target.setAttribute("aria-pressed", "true" );
+      this.mode = target.getAttribute("data-mode");
+      
+      console.log("mode: " + this.mode);
+    }
+
+
+
+    // adjust coordinates for transforms
+    function localCoords ( event, element ) {
+      var p = document.documentElement.createSVGPoint();
+      p.x = event.clientX;
+      p.y = event.clientY;
+      return p.matrixTransform(element.getScreenCTM().inverse());
+    }   
+
+  	function bind (scope, fn) {
+  		return function () {
+  		  return fn.apply( scope, arguments );
+  		}
+  	}
+
+
+
+  ]]></script>
+
+
+  <style>
+    *[role="button"] {
+      stroke: indigo;
+      fill: violet;
+      stroke-width: 1px;
+    }
+
+      *[role="button"] text {
+        font-size: 15px;
+        font-family: Verdana, sans-serif;
+        text-anchor: middle;
+        stroke: none;
+        fill: indigo;
+        pointer-events: none;
+      }
+
+      *[aria-pressed="true"] rect {
+        stroke-width: 3px;
+      }
+
+    svg#canvas {
+      pointer-events: all;
+    }
+
+    rect#backdrop {
+      fill: url(#grid100);
+      stroke: gray;
+    }
+
+    /*
+    rect {
+      shape-rendering: geometricPrecision;
+    }
+    */
+  </style>
+
+
+  <defs>
+    <pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="10" height="10" style="stroke:gray;stroke-width:.1;fill:none;"/>
+    </pattern>
+
+    <pattern id="grid100" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="100" height="100" style="stroke:gray;stroke-width:0.2;fill:url(#grid10);"/>
+    </pattern>
+  </defs>
+
+
+  <rect id="backdrop" x="0" y="0" width="600" height="600"/>
+
+  <svg id="canvas" x="0" y="0" width="100%" height="100%">
+    
+  </svg>
+
+  <g id="controls">
+    <g id="button-draw" transform="translate(10,10)" role="button" aria-pressed="true" data-mode="draw">
+      <rect x="0" y="0" width="50" height="20" rx="3" ry="3"/>
+      <text x="25" y="15">Draw</text>
+    </g>
+
+    <g id="button-drag" transform="translate(10,40)" role="button" aria-pressed="false" data-mode="drag">
+      <rect x="0" y="0" width="50" height="20" rx="3" ry="3"/>
+      <text x="25" y="15">Drag</text>
+    </g>
+  </g>
+
+
+
+</svg>

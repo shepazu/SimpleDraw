@@ -1,0 +1,674 @@
+<doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SimpleDraw</title>
+
+  <style> 
+    /*
+    HTML 
+    */  
+    body {
+      background: gainsboro;
+      padding: 0;
+      margin: 0;
+    }
+
+    h1 {
+      text-transform: capitalize;
+      font-size: 1.5em;
+      font-family: Impact, sans-serif;
+      margin: 0;
+      color: #1F497D;
+    }
+
+    section {
+      /*border: thin gray solid;*/
+      height: 100%
+    }
+
+      section#controls {
+        float: left;
+        padding: 0 0.5em;
+      }
+
+      section#drawing-area {
+        float: left;
+        padding: 0;
+        margin: 0;
+      }  
+
+    fieldset {
+      font-family: Impact, sans-serif;
+      border: 2px solid #1F497D;
+      border-radius: 2px;
+      margin-bottom: 0.5em
+    }
+
+    fieldset legend {
+      background: #1F497D;
+      color: #fff;
+      padding: 1px 5px;
+      font-size: 1em;
+      border-radius: 2px;
+      margin-left: -12px; 
+    }  
+
+    button {
+      font-family: Impact, sans-serif;
+      background-color: #1F497D;
+      color: #fff;
+      padding: 1px 5px;
+      font-size: 1em;
+      border-radius: 2px;
+      text-decoration: none;
+      border: none;
+      box-shadow: 1px 1px 2px #777;
+      display: block;
+      width: 6em;
+      margin: 0.25em
+    }  
+
+      button:hover, button:focus {
+        box-shadow: 2px 2px 4px #777;
+      }
+
+      button:active {
+        box-shadow: 0px 0px 1px #777;
+      }
+
+      button[aria-pressed="true"] {
+        color: #1F497D;
+        background-color: #fff;
+      }
+
+    ul[role="listbox"] {
+      font-family: Impact, sans-serif;
+      font-size: 1em;
+      text-decoration: none;
+      border: none;
+      box-shadow: 1px 1px 2px #777;
+      list-style: none;
+      background-color: #1F497D;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      width: 6em;
+    }  
+
+      ul[role="listbox"] li {
+        display: block;
+        margin: 4px;
+        padding: 1px;
+        border-radius: 2px;
+      }
+
+        ul[role="listbox"] li[aria-selected="false"] {
+          display: none;
+          /*outline: 2px black solid;*/
+          margin: 4px;
+          padding: 1px;
+        }
+
+          ul[role="listbox"] li[aria-selected="false"]:hover {
+            outline: 2px white solid;
+          }
+
+        ul[role="listbox"]:hover li[aria-selected="false"], 
+        ul[role="listbox"]:focus li[aria-selected="false"]{
+          display: block;
+        }  
+
+    input[type="number"] {
+      font-family: Impact, sans-serif;
+      font-size: 1em;
+      background-color: #1F497D;
+      color: #fff;
+      border: none;
+      padding: 1px 5px;
+      margin-left: -5px;
+      width: 3em;
+    }    
+
+    label {
+      font-family: Impact, sans-serif;
+      font-size: 1em;
+      background-color: #1F497D;
+      color: #fff;
+      padding: 1px 5px;
+      margin-right: 0;
+    }
+
+    /*
+    SVG 
+    */  
+    svg {
+      width: 580px;
+      height: 580px;
+      background: white; /* Note that this only works for the SVG root */
+    }
+
+    *[role="button"] {
+      stroke: indigo;
+      fill: violet;
+      stroke-width: 1px;
+    }
+
+      *[role="button"] text {
+        font-size: 12px;
+        font-family: Verdana, sans-serif;
+        text-anchor: middle;
+        stroke: none;
+        fill: indigo;
+        pointer-events: none;
+      }
+
+      *[aria-pressed="true"] rect {
+        stroke-width: 3px;
+      }
+
+    svg#canvas {
+      /* pointer-events: all; */
+    }
+
+    rect#backdrop {
+      fill: url(#grid100);
+      stroke: gray;
+    }
+  
+  </style>
+	
+  <script> 
+    window.onload = function () {
+      var svgrooot = document.getElementById("simpledraw");
+      var dnd = new simpledrawObj(svgrooot);
+      dnd.init();
+    }
+
+    function simpledrawObj(svgrooot) {
+      this.root = svgrooot;
+      this.backdrop = this.root.getElementById("backdrop");
+      this.canvas = this.root.getElementById("canvas");
+
+      this.activeEl = null;
+      this.points = null;
+
+      this.buttons = null;
+      this.mode = "draw-dot";
+
+      this.coords = this.root.createSVGPoint();
+      this.originpoint = this.root.createSVGPoint();
+
+      // styles
+      this.styles = {
+        "fill": "black",
+        "stroke": "black",
+        "stroke-width": "1px"
+      };
+
+      // constants
+      this.svgns = "http://www.w3.org/2000/svg";
+      this.xlinkns = "http://www.w3.org/1999/xlink";
+    }
+
+    simpledrawObj.prototype.init = function (){
+      this.root.addEventListener('click', bind(this, this.draw), false );
+
+      this.root.addEventListener('mousedown', bind(this, this.grab), false );
+      this.root.addEventListener('mousemove', bind(this, this.drag), false );
+      this.root.addEventListener('mouseup', bind(this, this.drop), false );
+
+      this.buttons = document.querySelectorAll("button");
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.addEventListener('click', bind(this, this.handleButtons), false );
+      }
+
+      this.listboxes = document.querySelectorAll("[role='listbox']");
+      for (var l = 0, lLen = this.listboxes.length; lLen > l; ++l) {
+        var eachListbox = this.listboxes[l];
+        eachListbox.addEventListener('click', bind(this, this.handleDropdown), false );
+      }
+
+      this.inputs = document.querySelectorAll("input[type='number']");
+      for (var i = 0, iLen = this.inputs.length; iLen > i; ++i) {
+        var eachInput = this.inputs[i];
+        eachInput.addEventListener('click', bind(this, this.handleInputs), false );
+      }
+
+      // console.log( JSON.stringify(this.styles).replace(/"/g, "").replace(/,/g, "; ").replace(/[{}]/g, "") )
+    }
+
+
+    /*
+    // draw
+    */
+    simpledrawObj.prototype.draw = function (event){
+      if ( this.backdrop == event.target || this.canvas == event.target.parentNode ) {
+        // adjust coords
+        this.coords = localCoords(event, this.backdrop, this.root);
+        //console.log(event.detail)
+
+        if (2 == event.detail){
+          this.reset();
+        } else {
+          switch (this.mode) {
+            case "draw-dot":
+              this.drawDot(event);
+              break;
+
+            case "draw-polyline":
+              this.drawPoly(event, "polyline" );
+              break;
+
+            case "draw-polygon":
+              this.drawPoly(event, "polygon");
+              break;
+
+            case "draw-rect":
+              this.drawRect(event);
+              break;
+
+            case "draw-circle":
+              this.drawCircle(event);
+              break;
+
+            case "draw-freehand":
+              this.drawFreehand(event);
+              break;
+
+          }
+        }
+      }
+    }
+
+    simpledrawObj.prototype.drawDot = function (event){
+      this.activeEl = document.createElementNS(this.svgns, "circle");
+      this.activeEl.setAttribute("cx", this.coords.x);
+      this.activeEl.setAttribute("cy", this.coords.y);
+      this.activeEl.setAttribute("r", "2");
+      this.activeEl.setAttribute("style", this.getStyle() );
+
+      // note that we're now appending draw elements to a specific canvas
+      this.canvas.appendChild( this.activeEl );
+
+      // if we don't set this to null, it starts dragging immediately!
+      this.activeEl = null;
+    }
+
+    simpledrawObj.prototype.drawPoly = function (event, shape){
+      if (!this.activeEl 
+          || shape != this.activeEl.localName ) {
+        this.activeEl = document.createElementNS(this.svgns, shape);
+        this.activeEl.setAttribute("style", this.getStyle() );
+      } else {
+        var points = this.activeEl.getAttribute("points");
+        this.points = points.split(" ");
+      }
+
+      if (!this.points) {
+        this.points = [];
+      }
+
+      this.points.push( this.coords.x + "," + this.coords.y );
+      this.activeEl.setAttribute("points", this.points.join(" "));
+
+      // no longer need to worry about SVG controls
+      this.canvas.appendChild( this.activeEl );
+    }
+
+    simpledrawObj.prototype.drawRect = function (event){
+      if (!this.activeEl ) {
+        this.activeEl = document.createElementNS(this.svgns, "rect");
+        this.activeEl.setAttribute("style", this.getStyle() );
+
+        if (!this.points) {
+          this.points = [];
+        }
+
+        // we're using the points array, but in a different way for rect than for polys  
+        this.points.push( this.coords.x );
+        this.points.push( this.coords.y );
+
+        this.activeEl.setAttribute("x", this.points[0] );
+        this.activeEl.setAttribute("y", this.points[1] );
+
+        this.canvas.appendChild( this.activeEl );
+      }      
+    }
+
+    simpledrawObj.prototype.drawCircle = function (event){
+      if (!this.activeEl ) {
+        this.activeEl = document.createElementNS(this.svgns, "circle");
+        this.activeEl.setAttribute("style", this.getStyle() );
+
+        if (!this.points) {
+          this.points = [];
+        }
+
+        // we're using the points array, but in a different way for rect than for polys  
+        this.points.push( this.coords.x );
+        this.points.push( this.coords.y );
+
+        this.activeEl.setAttribute("cx", this.points[0] );
+        this.activeEl.setAttribute("cy", this.points[1] );
+
+        this.canvas.appendChild( this.activeEl );
+      }      
+    }
+
+    simpledrawObj.prototype.drawFreehand = function (event){
+      if (!this.activeEl ) {
+        this.activeEl = document.createElementNS(this.svgns, "polyline");
+        this.activeEl.setAttribute("style", this.getStyle() );
+      }
+
+      var points = this.activeEl.getAttribute("points");
+      if (!points) {
+        points = "";
+      }
+      points += this.coords.x + "," + this.coords.y + " ";
+      this.activeEl.setAttribute("points", points);
+
+      if ( this.canvas != event.target.parentNode ) {
+        this.canvas.appendChild( this.activeEl );
+      }
+    }
+
+
+    /*
+    // drag-n-drop
+    */
+    simpledrawObj.prototype.grab = function (event){
+      if ( "drag" == this.mode || "erase" == this.mode ){
+        // stop native drag-n-drop
+        event.preventDefault();
+        event.stopPropagation();
+
+        // only grab things in drawing area
+        if ( this.canvas == event.target.parentNode ) {
+          var target = event.target;
+          if (this.backdrop != target) {
+            this.activeEl = target;
+
+            this.coords = localCoords(event, this.backdrop, this.root);
+            this.originpoint = this.coords;
+
+            // adjust for existing transforms
+            var transform = this.activeEl.getAttribute("transform");
+            if (transform) {
+              var translate = transform.replace("translate(", "").replace(")", "").split(",");
+              this.originpoint.x -= parseFloat( translate[0] );
+              this.originpoint.y -= parseFloat( translate[1] );
+            }
+          }
+        }
+      } 
+    }
+
+    simpledrawObj.prototype.drag = function (event){
+      // stop native drag-n-drop
+      event.preventDefault();
+      event.stopPropagation();
+
+      this.coords = localCoords(event, this.backdrop, this.root);
+
+      if ( "drag" == this.mode ){
+        if ( this.activeEl ) {
+          var x = this.coords.x - this.originpoint.x;
+          var y = this.coords.y - this.originpoint.y;
+
+          this.activeEl.setAttribute("transform", "translate(" + x + "," + y + ")");
+        }
+      } else if (this.activeEl) {
+        switch (this.mode) {
+          case "draw-dot":
+            break;
+
+          case "draw-rect":
+            this.updateRect(event);
+            break;
+
+          case "draw-circle":
+            this.updateCircle(event);
+            break;
+
+          case "draw-polyline":
+          case "draw-polygon":
+            this.updatePoly(event);            
+            break;
+
+          case "draw-freehand":
+            this.updateFreehand(event);            
+            break;
+        }
+      }
+    }
+
+    simpledrawObj.prototype.drop = function (event){
+      if ( "drag" == this.mode ){
+        this.activeEl = null;
+      } else if ( "erase" == this.mode ) {
+        if ( this.activeEl ) {
+          this.activeEl.parentNode.removeChild( this.activeEl );
+          this.activeEl = null;
+        }
+      }
+    }
+
+    /*
+    // Update shapes
+    */
+    simpledrawObj.prototype.updatePoly = function (event){
+      var points = this.points.join(" ");
+      points += " " + this.coords.x + "," + this.coords.y;
+      this.activeEl.setAttribute("points", points);
+    }
+    
+    simpledrawObj.prototype.updateFreehand = function (event){
+      var points = this.activeEl.getAttribute("points");
+      if (!points) {
+        points = "";
+      }
+      points += this.coords.x + "," + this.coords.y + " ";
+      this.activeEl.setAttribute("points", points);
+    }
+    
+    simpledrawObj.prototype.updateRect = function (event){
+      // we're using the points array, but in a different way for rect than for polys  
+      this.points[2] = this.coords.x;
+      this.points[3] = this.coords.y;
+
+      var x = this.points[0];
+      var width = this.points[2] - this.points[0];
+      if ( 0 > width ) {
+        //if the current cursor x is to the left of the origin, we have to reposition the x attribute
+        x = this.points[2];
+        width = this.points[0] - this.points[2];
+      }
+
+      var y = this.points[1];
+      var height = this.points[3] - this.points[1];
+      if ( 0 > height ) {
+        //if the current cursor y is to the top of the origin, we have to reposition the y attribute
+        y = this.points[3];
+        height = this.points[1] - this.points[3];
+      }
+
+      this.activeEl.setAttribute("x", x );
+      this.activeEl.setAttribute("y", y );
+      this.activeEl.setAttribute("width", width );
+      this.activeEl.setAttribute("height", height );
+    }
+
+    simpledrawObj.prototype.updateCircle = function (event){
+      this.points[2] = this.coords.x;
+      this.points[3] = this.coords.y;
+
+      // geometry magic!
+      var radius = Math.sqrt(Math.pow(Math.abs(this.points[2] - this.points[0]), 2) 
+                 + Math.pow(Math.abs(this.points[3] - this.points[1]), 2));
+      this.activeEl.setAttribute("r", radius );
+    }
+
+
+    /*
+    // UI controls
+    */
+    simpledrawObj.prototype.handleButtons = function (event){
+      this.reset();
+
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.setAttribute("aria-pressed", "false" );
+      }
+
+      var target = event.target;
+      target.setAttribute("aria-pressed", "true" );
+      this.mode = target.getAttribute("data-mode");
+      
+      console.log("mode: " + this.mode);
+    }
+
+    simpledrawObj.prototype.handleDropdown = function (event){
+      var target = event.target;
+      var options = target.parentNode.querySelectorAll("[role='option']")
+      for (var o = 0, oLen = options.length; oLen > o; ++o) {
+        var eachOption = options[o];
+        eachOption.setAttribute("aria-selected", "false" );
+      }
+      target.setAttribute("aria-selected", "true" );
+      var prop = target.parentNode.getAttribute("data-property");
+      this.styles[prop] = target.textContent;
+    }
+
+    simpledrawObj.prototype.handleInputs = function (event){
+      var target = event.target;
+      var prop = target.getAttribute("data-property");
+      this.styles[prop] = target.value;
+    }
+
+    simpledrawObj.prototype.getStyle = function (){
+      var style = JSON.stringify(this.styles)
+                      .replace(/"/g, "")
+                      .replace(/,/g, "; ")
+                      .replace(/[{}]/g, "");
+
+      return style;
+    }
+
+
+    simpledrawObj.prototype.reset = function (event){
+      // clicking on any button should start a new active element and new mode
+      this.activeEl = null;
+      this.points = null;
+    }
+
+
+    // adjust coordinates for transforms
+    // note that this changed to add the SVG root element
+    function localCoords ( event, element, root ) {
+      var p = root.createSVGPoint();
+      p.x = event.clientX;
+      p.y = event.clientY;
+      return p.matrixTransform(element.getScreenCTM().inverse());
+    }   
+
+    function bind (scope, fn) {
+      return function () {
+        return fn.apply( scope, arguments );
+      }
+    }
+  </script>
+	
+</head>
+<body>
+
+  <main id="app">  
+    <section id="controls">
+      <h1>SimpleDraw</h1>  
+      <fieldset>
+        <legend>shapes</legend>
+        <button aria-pressed="true" data-mode="draw-dot">dot</button>
+        <button aria-pressed="false" data-mode="draw-polyline">polyline</button>
+        <button aria-pressed="false" data-mode="draw-polygon">polygon</button>
+        <button aria-pressed="false" data-mode="draw-rect">rectangle</button>
+        <button aria-pressed="false" data-mode="draw-circle">circle</button>
+        <button aria-pressed="false" data-mode="draw-freehand">freehand</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>controls</legend>
+        <button aria-pressed="false" data-mode="drag">drag</button>
+        <button aria-pressed="false" data-mode="erase">erase</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>stroke</legend>
+        <ul id="colors" role="listbox" data-property="stroke" tabindex="1">
+          <li role="option" tabindex="1" tabindex="1" aria-selected="true" style="color:black; background-color:black;">black</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:gray; background-color:gray;">gray</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:white; background-color:white;">white</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:red; background-color:red;">red</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:blue; background-color:blue;">blue</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:green; background-color:green;">green</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:yellow; background-color:yellow;">yellow</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:orange; background-color:orange;">orange</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:purple; background-color:purple;">purple</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:black; background-color:white;">none</li>
+        </ul>
+        <label for="stroke-width">width:</label>
+        <input id="stroke-width" type="number" min="0.5" max="10" step="0.5" value="1" data-property="stroke-width"/>
+      </fieldset>
+
+      <fieldset>
+        <legend>fill</legend>
+        <ul id="colors" role="listbox" data-property="fill" tabindex="1">
+          <li role="option" tabindex="1" tabindex="1" aria-selected="true" style="color:black; background-color:black;">black</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:gray; background-color:gray;">gray</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:white; background-color:white;">white</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:red; background-color:red;">red</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:blue; background-color:blue;">blue</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:green; background-color:green;">green</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:yellow; background-color:yellow;">yellow</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:orange; background-color:orange;">orange</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:purple; background-color:purple;">purple</li>
+          <li role="option" tabindex="1" aria-selected="false" style="color:black; background-color:white;">none</li>
+        </ul>
+        <label for="fill-opacity">opacity:</label>
+        <input id="fill-opacity" type="number" min="0" max="1" step="0.1" value="1" data-property="fill-opacity"/>
+      </fieldset>
+
+    </section>
+    
+    <section id="drawing-area">
+      <svg id="simpledraw"
+         xmlns="http://www.w3.org/2000/svg"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         width="100%" height="100%" viewBox="0 0 600 600">
+
+      <title>SimpleDraw</title>
+
+      <defs>
+        <pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="10" height="10" style="stroke:gray;stroke-width:.1;fill:none;"/>
+        </pattern>
+
+        <pattern id="grid100" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="100" height="100" style="stroke:gray;stroke-width:0.2;fill:url(#grid10);"/>
+        </pattern>
+      </defs>
+
+
+      <rect id="backdrop" x="0" y="0" width="600" height="600"/>
+
+      <svg id="canvas" x="0" y="0" width="100%" height="100%"> </svg>
+    </svg>
+    </section>
+  </main>
+
+  <script>
+  </script>
+
+</body>
+</html>

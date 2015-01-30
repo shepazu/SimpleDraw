@@ -1,0 +1,431 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="100%" height="100%" viewBox="0 0 600 600">
+
+  <title>SimpleDraw</title>
+
+  <script type="text/ecmascript"><![CDATA[
+    window.onload = function () {
+      var dnd = new simpledrawObj();
+      dnd.init();
+    }
+
+    function simpledrawObj() {
+      this.root = document.documentElement;
+      this.backdrop = document.getElementById("backdrop");
+      this.canvas = document.getElementById("canvas");
+
+      this.activeEl = null;
+      this.points = null;
+
+      this.buttons = null;
+      this.mode = "draw-dot";
+
+      this.coords = document.documentElement.createSVGPoint();
+      this.originpoint = document.documentElement.createSVGPoint();
+
+      // constants
+      this.svgns = "http://www.w3.org/2000/svg";
+      this.xlinkns = "http://www.w3.org/1999/xlink";
+    }
+
+    simpledrawObj.prototype.init = function (event){
+      this.root.addEventListener('click', bind(this, this.draw), false );
+
+      this.root.addEventListener('mousedown', bind(this, this.grab), false );
+      this.root.addEventListener('mousemove', bind(this, this.drag), false );
+      this.root.addEventListener('mouseup', bind(this, this.drop), false );
+
+      this.buttons = this.root.querySelectorAll("[role='button']");
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.addEventListener('click', bind(this, this.handleButtons), false );
+      }
+    }
+
+
+    /*
+    // draw
+    */
+    simpledrawObj.prototype.draw = function (event){
+      if ( this.backdrop == event.target || this.canvas == event.target.parentNode ) {
+        // adjust coords
+        this.coords = localCoords(event, this.backdrop);
+        //console.log(event.detail)
+
+        if (2 == event.detail){
+          this.reset();
+        } else {
+          switch (this.mode) {
+            case "draw-dot":
+              this.drawDot(event);
+              break;
+
+            case "draw-polyline":
+              var style = "fill:cornflowerblue; ";
+              style += "stroke:cornflowerblue; ";
+              style += "stroke-width:1px; ";
+              style += "stroke-linecap:round; ";
+              style += "stroke-linejoin:round; ";
+              style += "fill-opacity:0.5; ";
+              this.drawPoly(event, "polyline", style);
+              break;
+
+            case "draw-polygon":
+              var style = "fill:crimson; ";
+              style += "stroke:crimson; ";
+              style += "stroke-width:1px; ";
+              style += "stroke-linecap:round; ";
+              style += "stroke-linejoin:round; ";
+              style += "fill-opacity:0.5; ";
+              this.drawPoly(event, "polygon", style);
+              break;
+
+            case "draw-rect":
+              this.drawRect(event);
+              break;
+
+            case "draw-freehand":
+              this.drawFreehand(event);
+              break;
+
+          }
+        }
+      }
+    }
+
+    simpledrawObj.prototype.drawDot = function (event){
+      this.activeEl = document.createElementNS(this.svgns, "circle");
+      this.activeEl.setAttribute("cx", this.coords.x);
+      this.activeEl.setAttribute("cy", this.coords.y);
+      this.activeEl.setAttribute("r", "2");
+      this.activeEl.setAttribute("fill", "none");
+      this.activeEl.setAttribute("stroke", "blue");
+      this.activeEl.setAttribute("stroke-width", "3");
+      this.activeEl.setAttribute("stroke-linecap", "round");
+      this.activeEl.setAttribute("stroke-linejoin", "round");
+
+      // note that we're now appending draw elements to a specific canvas
+      this.canvas.appendChild( this.activeEl );
+
+      // if we don't set this to null, it starts dragging immediately!
+      this.activeEl = null;
+    }
+
+    simpledrawObj.prototype.drawPoly = function (event, shape, style){
+      if (!this.activeEl 
+          || shape != this.activeEl.localName ) {
+        this.activeEl = document.createElementNS(this.svgns, shape);
+        this.activeEl.setAttribute("style", style);
+      } else {
+        var points = this.activeEl.getAttribute("points");
+        this.points = points.split(" ");
+      }
+
+      if (!this.points) {
+        this.points = [];
+      }
+
+      this.points.push( this.coords.x + "," + this.coords.y );
+      this.activeEl.setAttribute("points", this.points.join(" "));
+
+      if ( this.canvas != event.target.parentNode ) {
+        this.canvas.appendChild( this.activeEl );
+      }
+    }
+
+    simpledrawObj.prototype.drawRect = function (event){
+      if (!this.activeEl ) {
+        this.activeEl = document.createElementNS(this.svgns, "rect");
+        var style = "fill:lime; ";
+        style += "stroke:lime; ";
+        style += "stroke-width:1px; ";
+        style += "fill-opacity:0.5; ";
+        this.activeEl.setAttribute("style", style);
+
+        if (!this.points) {
+          this.points = [];
+        }
+
+        // we're using the points array, but in a different way for rect than for polys  
+        this.points.push( this.coords.x );
+        this.points.push( this.coords.y );
+
+        this.activeEl.setAttribute("x", this.points[0] );
+        this.activeEl.setAttribute("y", this.points[1] );
+
+        this.canvas.appendChild( this.activeEl );
+      }      
+    }
+
+    simpledrawObj.prototype.drawFreehand = function (event){
+      if (!this.activeEl ) {
+        this.activeEl = document.createElementNS(this.svgns, "polyline");
+        var style = "fill:none; ";
+        style += "stroke:purple; ";
+        style += "stroke-width:2px; ";
+        style += "stroke-linecap:round; ";
+        style += "stroke-linejoin:round; ";
+        style += "pointer-events:stroke; ";
+        this.activeEl.setAttribute("style", style);
+      }
+
+      var points = this.activeEl.getAttribute("points");
+      if (!points) {
+        points = "";
+      }
+      points += this.coords.x + "," + this.coords.y + " ";
+      this.activeEl.setAttribute("points", points);
+
+      if ( this.canvas != event.target.parentNode ) {
+        this.canvas.appendChild( this.activeEl );
+      }
+    }
+
+
+    /*
+    // drag-n-drop
+    */
+    simpledrawObj.prototype.grab = function (event){
+      if ( "drag" == this.mode || "erase" == this.mode ){
+        // stop native drag-n-drop
+        event.preventDefault();
+        event.stopPropagation();
+
+        // only grab things in drawing area
+        if ( this.canvas == event.target.parentNode ) {
+          var target = event.target;
+          if (this.backdrop != target) {
+            this.activeEl = target;
+
+            this.coords = localCoords(event, this.backdrop);
+            this.originpoint = this.coords;
+
+            // adjust for existing transforms
+            var transform = this.activeEl.getAttribute("transform");
+            if (transform) {
+              var translate = transform.replace("translate(", "").replace(")", "").split(",");
+              this.originpoint.x -= parseFloat( translate[0] );
+              this.originpoint.y -= parseFloat( translate[1] );
+            }
+          }
+        }
+      } 
+    }
+
+    simpledrawObj.prototype.drag = function (event){
+      // stop native drag-n-drop
+      event.preventDefault();
+      event.stopPropagation();
+
+      this.coords = localCoords(event, this.backdrop);
+
+      if ( "drag" == this.mode ){
+        if ( this.activeEl ) {
+          var x = this.coords.x - this.originpoint.x;
+          var y = this.coords.y - this.originpoint.y;
+
+          this.activeEl.setAttribute("transform", "translate(" + x + "," + y + ")");
+        }
+      } else if (this.activeEl) {
+        switch (this.mode) {
+          case "draw-dot":
+            break;
+
+          case "draw-rect":
+            // we're using the points array, but in a different way for rect than for polys  
+            this.points[2] = this.coords.x;
+            this.points[3] = this.coords.y;
+
+            var x = this.points[0];
+            var width = this.points[2] - this.points[0];
+            if ( 0 > width ) {
+              //if the current cursor x is to the left of the origin, we have to reposition the x attribute
+              x = this.points[2];
+              width = this.points[0] - this.points[2];
+            }
+
+            var y = this.points[1];
+            var height = this.points[3] - this.points[1];
+            if ( 0 > height ) {
+              //if the current cursor y is to the top of the origin, we have to reposition the y attribute
+              y = this.points[3];
+              height = this.points[1] - this.points[3];
+            }
+
+            this.activeEl.setAttribute("x", x );
+            this.activeEl.setAttribute("y", y );
+            this.activeEl.setAttribute("width", width );
+            this.activeEl.setAttribute("height", height );
+            break;
+
+          case "draw-polyline":
+          case "draw-polygon":
+            var points = this.points.join(" ");
+            points += " " + this.coords.x + "," + this.coords.y;
+            this.activeEl.setAttribute("points", points);
+            break;
+
+          case "draw-freehand":
+            var points = this.activeEl.getAttribute("points");
+            if (!points) {
+              points = "";
+            }
+            points += this.coords.x + "," + this.coords.y + " ";
+            this.activeEl.setAttribute("points", points);
+            break;
+        }
+      }
+    }
+
+    simpledrawObj.prototype.drop = function (event){
+      if ( "drag" == this.mode ){
+        this.activeEl = null;
+      } else if ( "erase" == this.mode ) {
+        if ( this.activeEl ) {
+          this.activeEl.parentNode.removeChild( this.activeEl );
+          this.activeEl = null;
+        }
+      }
+    }
+
+
+    /*
+    // UI controls
+    */
+    simpledrawObj.prototype.handleButtons = function (event){
+      this.reset();
+
+      for (var b = 0, bLen = this.buttons.length; bLen > b; ++b) {
+        var eachButton = this.buttons[b];
+        eachButton.setAttribute("aria-pressed", "false" );
+      }
+
+      var target = event.target.parentNode;
+      target.setAttribute("aria-pressed", "true" );
+      this.mode = target.getAttribute("data-mode");
+      
+      console.log("mode: " + this.mode);
+    }
+
+    simpledrawObj.prototype.reset = function (event){
+      // clicking on any button should start a new active element and new mode
+      this.activeEl = null;
+      this.points = null;
+    }
+
+
+    // adjust coordinates for transforms
+    function localCoords ( event, element ) {
+      var p = document.documentElement.createSVGPoint();
+      p.x = event.clientX;
+      p.y = event.clientY;
+      return p.matrixTransform(element.getScreenCTM().inverse());
+    }   
+
+    function bind (scope, fn) {
+      return function () {
+        return fn.apply( scope, arguments );
+      }
+    }
+
+
+
+  ]]></script>
+
+
+  <style>
+    *[role="button"] {
+      stroke: indigo;
+      fill: violet;
+      stroke-width: 1px;
+    }
+
+      *[role="button"] text {
+        font-size: 12px;
+        font-family: Verdana, sans-serif;
+        text-anchor: middle;
+        stroke: none;
+        fill: indigo;
+        pointer-events: none;
+      }
+
+      *[aria-pressed="true"] rect {
+        stroke-width: 3px;
+      }
+
+    svg#canvas {
+      /* pointer-events: all; */
+    }
+
+    rect#backdrop {
+      fill: url(#grid100);
+      stroke: gray;
+    }
+
+    /*
+    rect {
+      shape-rendering: geometricPrecision;
+    }
+    */
+  </style>
+
+
+  <defs>
+    <pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="10" height="10" style="stroke:gray;stroke-width:.1;fill:none;"/>
+    </pattern>
+
+    <pattern id="grid100" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="100" height="100" style="stroke:gray;stroke-width:0.2;fill:url(#grid10);"/>
+    </pattern>
+  </defs>
+
+
+  <rect id="backdrop" x="0" y="0" width="600" height="600"/>
+
+  <svg id="canvas" x="0" y="0" width="100%" height="100%">
+    
+  </svg>
+
+  <g id="controls" transform="translate(10,10)">
+    <g id="draw-controls">
+      <g id="button-draw-dot" role="button" aria-pressed="true" data-mode="draw-dot">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Draw Dot</text>
+      </g>
+
+      <g id="button-draw-polyline" transform="translate(0,30)" role="button" aria-pressed="false" data-mode="draw-polyline">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Draw Polyline</text>
+      </g>
+
+      <g id="button-draw-polygon" transform="translate(0,60)" role="button" aria-pressed="false" data-mode="draw-polygon">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Draw Polygon</text>
+      </g>
+
+      <g id="button-draw-rect" transform="translate(0,90)" role="button" aria-pressed="false" data-mode="draw-rect">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Draw Rectangle</text>
+      </g>
+
+      <g id="button-draw-freehand" transform="translate(0,120)" role="button" aria-pressed="false" data-mode="draw-freehand">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Draw Freehand</text>
+      </g>
+    </g>
+
+    <g id="meta-controls" transform="translate(0,160)">
+      <g id="button-drag" transform="translate(0,0)" role="button" aria-pressed="false" data-mode="drag">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Drag</text>
+      </g>
+
+      <g id="button-erase" transform="translate(0,30)" role="button" aria-pressed="false" data-mode="erase">
+        <rect x="0" y="0" width="100" height="20" rx="3" ry="3"/>
+        <text x="50" y="15">Erase</text>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="600" height="600" viewBox="0 0 600 600">
+
+  <title>SimpleDraw</title>
+
+  <script type="text/ecmascript"><![CDATA[
+    window.onclick = drawDot;
+    
+    function drawDot ( event ) {
+      // namespace constant
+      var svgns = "http://www.w3.org/2000/svg";
+
+      var dot = document.createElementNS(svgns, "circle");
+      dot.setAttribute("cx", event.clientX);
+      dot.setAttribute("cy", event.clientY);
+      dot.setAttribute("r", "2");
+      dot.setAttribute("fill", "none");
+      dot.setAttribute("stroke", "blue");
+      dot.setAttribute("stroke-linecap", "round");
+      dot.setAttribute("stroke-linejoin", "round");
+      document.documentElement.appendChild( dot );
+    }
+
+
+  ]]></script>
+
+  <rect id="backdrop" x="0" y="0" width="600" height="600" fill="aliceblue" stroke="blue"/>
+
+</svg>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="100%" height="100%" viewBox="0 0 600 600">
+
+  <title>Drag-N-Drop</title>
+
+  <script type="text/ecmascript"><![CDATA[
+    var dragEl = null;
+    var backdrop = null;
+
+    window.onmousedown = grab;
+    window.onmousemove = drag;
+    window.onmouseup = drop;
+
+    window.onload = function () {
+      backdrop = document.getElementById("backdrop");
+    }
+
+    function grab (event){
+      // stop native drag-n-drop
+      event.preventDefault();
+      event.stopPropagation();
+
+      var target = event.target;
+      if (backdrop != target) {
+        dragEl = target;
+      }
+    }
+
+    function drag (event){
+      if ( dragEl ) {
+        coords = localCoords(event, backdrop);
+        dragEl.setAttribute("cx", coords.x);
+        dragEl.setAttribute("cy", coords.y);
+      }
+    }
+
+    function drop (event){
+      dragEl = null;
+    }
+
+    // adjust coordinates for transforms
+    function localCoords (event, element) {
+      var p = document.documentElement.createSVGPoint();
+      p.x = event.clientX;
+      p.y = event.clientY;
+      return p.matrixTransform(element.getScreenCTM().inverse());
+    }   
+
+  ]]></script>
+
+  <rect id="backdrop" x="0" y="0" width="600" height="600" fill="aliceblue" stroke="blue"/>
+
+  <circle cx="300" cy="300" r="20" fill="cornflowerblue" />
+
+</svg>
